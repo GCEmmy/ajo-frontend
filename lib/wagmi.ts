@@ -8,6 +8,10 @@ export const arcTestnet = defineChain({
   rpcUrls: {
     default: { http: ["https://rpc.archetypenet.io"] },
   },
+  blockExplorers: {
+    default: { name: "ARC Explorer", url: "https://explorer.archetypenet.io" },
+  },
+  testnet: true,
 });
 
 export const config = createConfig({

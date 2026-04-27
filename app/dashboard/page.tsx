@@ -60,6 +60,15 @@ export default function Dashboard() {
       ) : (
         <div className="max-w-2xl mx-auto px-6 py-12 grid gap-6">
 
+          {/* FAUCET BANNER */}
+          <div style={{background: 'rgba(93,168,122,0.1)', border: '1px solid rgba(46,107,70,0.2)'}} className="p-4 rounded-2xl text-center">
+            <p className="text-sm text-gray-600 mb-2">Need test ETH to use Ajo on ARC Testnet?</p>
+            <a href="https://faucet.archetypenet.io" target="_blank" style={{background: '#2E6B46'}} className="inline-block px-4 py-2 text-sm text-white rounded-xl hover:opacity-90">
+              Get Free Test ETH from Faucet
+            </a>
+          </div>
+
+          {/* CREATE GROUP */}
           <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.1)'}} className="p-6 rounded-2xl shadow-sm">
             <h2 className="text-xl font-bold mb-4" style={{color: '#17402A'}}>Create a New Ajo</h2>
             <input className="w-full border rounded-xl px-4 py-3 mb-3 text-sm" placeholder="Contribution amount (ETH e.g 0.01)" value={amount} onChange={e => setAmount(e.target.value)} />
@@ -70,6 +79,7 @@ export default function Dashboard() {
             {isSuccess && <p className="text-green-600 text-sm mt-2">Ajo created successfully!</p>}
           </div>
 
+          {/* JOIN GROUP */}
           <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.1)'}} className="p-6 rounded-2xl shadow-sm">
             <h2 className="text-xl font-bold mb-4" style={{color: '#17402A'}}>Join an Ajo</h2>
             <input className="w-full border rounded-xl px-4 py-3 mb-4 text-sm" placeholder="Group ID" value={groupId} onChange={e => setGroupId(e.target.value)} />
@@ -78,6 +88,7 @@ export default function Dashboard() {
             </button>
           </div>
 
+          {/* CONTRIBUTE */}
           <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.1)'}} className="p-6 rounded-2xl shadow-sm">
             <h2 className="text-xl font-bold mb-4" style={{color: '#17402A'}}>Make Contribution</h2>
             <input className="w-full border rounded-xl px-4 py-3 mb-3 text-sm" placeholder="Group ID" value={groupId} onChange={e => setGroupId(e.target.value)} />
@@ -87,6 +98,7 @@ export default function Dashboard() {
             </button>
           </div>
 
+          {/* TRIGGER PAYOUT */}
           <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.1)'}} className="p-6 rounded-2xl shadow-sm">
             <h2 className="text-xl font-bold mb-4" style={{color: '#17402A'}}>Trigger Payout (Admin only)</h2>
             <input className="w-full border rounded-xl px-4 py-3 mb-4 text-sm" placeholder="Group ID" value={groupId} onChange={e => setGroupId(e.target.value)} />
