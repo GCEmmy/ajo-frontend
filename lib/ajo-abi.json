@@ -1,5 +1,16 @@
 [
   {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_usdc",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "function",
     "name": "contribute",
     "inputs": [
@@ -10,7 +21,7 @@
       }
     ],
     "outputs": [],
-    "stateMutability": "payable"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -67,7 +78,7 @@
     "name": "groups",
     "inputs": [
       {
-        "name": "id",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -198,6 +209,19 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "usdc",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "event",

@@ -1,15 +1,27 @@
 "use client";
 import { useState } from "react";
 import { useWriteContract, useAccount } from "wagmi";
-import { parseEther } from "viem";
+import { parseUnits } from "viem";
 import { ajoContract } from "@/lib/contract";
 import { ConnectWallet } from "@/components/ConnectWallet";
+
+const USDC_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
+const USDC_ABI = [
+  {
+    name: "approve",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "spender", type: "address" }, { name: "amount", type: "uint256" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const;
 
 export default function Dashboard() {
   const { isConnected } = useAccount();
 
   const { writeContract: writeCreate, isPending: creatingGroup, isSuccess: groupCreated } = useWriteContract();
   const { writeContract: writeJoin, isPending: joiningGroup, isSuccess: groupJoined } = useWriteContract();
+  const { writeContract: writeApprove, isPending: approving, isSuccess: approved } = useWriteContract();
   const { writeContract: writeContribute, isPending: contributing, isSuccess: contributed } = useWriteContract();
   const { writeContract: writePayout, isPending: payingOut, isSuccess: payoutDone } = useWriteContract();
 
@@ -25,7 +37,7 @@ export default function Dashboard() {
     writeCreate({
       ...ajoContract,
       functionName: "createGroup",
-      args: [parseEther(createAmount), BigInt(createMembers)],
+      args: [parseUnits(createAmount, 6), BigInt(createMembers)],
     });
   }
 
@@ -38,13 +50,22 @@ export default function Dashboard() {
     });
   }
 
+  function approveUSDC() {
+    if (!contributeAmount) return;
+    writeApprove({
+      address: USDC_ADDRESS,
+      abi: USDC_ABI,
+      functionName: "approve",
+      args: [ajoContract.address, parseUnits(contributeAmount, 6)],
+    });
+  }
+
   function contribute() {
-    if (!contributeGroupId || !contributeAmount) return;
+    if (!contributeGroupId) return;
     writeContribute({
       ...ajoContract,
       functionName: "contribute",
       args: [BigInt(contributeGroupId)],
-      value: parseEther(contributeAmount),
     });
   }
 
@@ -74,21 +95,21 @@ export default function Dashboard() {
 
           {/* FAUCET BANNER */}
           <div style={{background: 'rgba(93,168,122,0.1)', border: '1px solid rgba(46,107,70,0.2)'}} className="p-4 rounded-2xl text-center">
-            <p className="text-sm text-gray-600 mb-2">Need test ETH to use Ajo on ARC Testnet?</p>
+            <p className="text-sm text-gray-600 mb-2">Need test USDC to use Ajo on ARC Testnet?</p>
             <a href="https://faucet.circle.com/" target="_blank" style={{background: '#2E6B46'}} className="inline-block px-4 py-2 text-sm text-white rounded-xl hover:opacity-90">
-              Get Free Test ETH from Circle Faucet
+              Get Free Test USDC from Circle Faucet
             </a>
           </div>
 
           {/* CREATE GROUP */}
           <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.1)'}} className="p-6 rounded-2xl shadow-sm">
             <h2 className="text-xl font-bold mb-4" style={{color: '#17402A'}}>Create a New Ajo</h2>
-            <input className="w-full border rounded-xl px-4 py-3 mb-3 text-sm" placeholder="Contribution amount (ETH e.g 0.01)" value={createAmount} onChange={e => setCreateAmount(e.target.value)} />
+            <input className="w-full border rounded-xl px-4 py-3 mb-3 text-sm" placeholder="Contribution amount in USDC (e.g 10)" value={createAmount} onChange={e => setCreateAmount(e.target.value)} />
             <input className="w-full border rounded-xl px-4 py-3 mb-4 text-sm" placeholder="Number of members (e.g 5)" value={createMembers} onChange={e => setCreateMembers(e.target.value)} />
             <button onClick={createGroup} disabled={creatingGroup} style={{background: '#2E6B46'}} className="w-full py-3 text-white rounded-xl font-semibold hover:opacity-90">
               {creatingGroup ? "Creating..." : "Create Ajo"}
             </button>
-            {groupCreated && <p className="text-green-600 text-sm mt-2">Ajo created successfully!</p>}
+            {groupCreated && <p className="text-green-600 text-sm mt-2">Ajo created! Note your Group ID.</p>}
           </div>
 
           {/* JOIN GROUP */}
@@ -105,10 +126,15 @@ export default function Dashboard() {
           <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.1)'}} className="p-6 rounded-2xl shadow-sm">
             <h2 className="text-xl font-bold mb-4" style={{color: '#17402A'}}>Make Contribution</h2>
             <input className="w-full border rounded-xl px-4 py-3 mb-3 text-sm" placeholder="Group ID" value={contributeGroupId} onChange={e => setContributeGroupId(e.target.value)} />
-            <input className="w-full border rounded-xl px-4 py-3 mb-4 text-sm" placeholder="Amount (ETH)" value={contributeAmount} onChange={e => setContributeAmount(e.target.value)} />
-            <button onClick={contribute} disabled={contributing} style={{background: '#5DA87A'}} className="w-full py-3 text-white rounded-xl font-semibold hover:opacity-90">
-              {contributing ? "Sending..." : "Contribute"}
+            <input className="w-full border rounded-xl px-4 py-3 mb-4 text-sm" placeholder="Amount in USDC (e.g 10)" value={contributeAmount} onChange={e => setContributeAmount(e.target.value)} />
+            <button onClick={approveUSDC} disabled={approving} style={{background: '#5DA87A'}} className="w-full py-3 text-white rounded-xl font-semibold hover:opacity-90 mb-2">
+              {approving ? "Approving..." : "Step 1: Approve USDC"}
             </button>
+            {approved && (
+              <button onClick={contribute} disabled={contributing} style={{background: '#2E6B46'}} className="w-full py-3 text-white rounded-xl font-semibold hover:opacity-90">
+                {contributing ? "Sending..." : "Step 2: Contribute"}
+              </button>
+            )}
             {contributed && <p className="text-green-600 text-sm mt-2">Contribution sent!</p>}
           </div>
 
