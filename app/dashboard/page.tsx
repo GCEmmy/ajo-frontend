@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useWriteContract, useAccount } from "wagmi";
+import { useWriteContract, useAccount, useReadContract } from "wagmi";
 import { parseUnits } from "viem";
 import { ajoContract } from "@/lib/contract";
 import { ConnectWallet } from "@/components/ConnectWallet";
@@ -24,6 +24,11 @@ export default function Dashboard() {
   const { writeContract: writeApprove, isPending: approving, isSuccess: approved } = useWriteContract();
   const { writeContract: writeContribute, isPending: contributing, isSuccess: contributed } = useWriteContract();
   const { writeContract: writePayout, isPending: payingOut, isSuccess: payoutDone } = useWriteContract();
+
+  const { data: groupCount } = useReadContract({
+    ...ajoContract,
+    functionName: "groupCount",
+  });
 
   const [createAmount, setCreateAmount] = useState("");
   const [createMembers, setCreateMembers] = useState("");
@@ -109,7 +114,13 @@ export default function Dashboard() {
             <button onClick={createGroup} disabled={creatingGroup} style={{background: '#2E6B46'}} className="w-full py-3 text-white rounded-xl font-semibold hover:opacity-90">
               {creatingGroup ? "Creating..." : "Create Ajo"}
             </button>
-            {groupCreated && <p className="text-green-600 text-sm mt-2">Ajo created! Note your Group ID.</p>}
+            {groupCreated && (
+              <div style={{background: '#2E6B4610', border: '1px solid #2E6B46'}} className="mt-3 p-3 rounded-xl text-center">
+                <p className="text-sm text-gray-600">Ajo created! Your Group ID is:</p>
+                <p className="text-2xl font-bold" style={{color: '#2E6B46'}}>{groupCount ? Number(groupCount).toString() : "..."}</p>
+                <p className="text-xs text-gray-400">Share this ID with your members</p>
+              </div>
+            )}
           </div>
 
           {/* JOIN GROUP */}
