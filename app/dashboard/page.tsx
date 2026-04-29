@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
-import { useWriteContract, useAccount, useReadContract } from "wagmi";
-import { parseUnits } from "viem";
+import { useState, useEffect } from "react";
+import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt } from "wagmi";
+import { parseUnits, decodeEventLog } from "viem";
 import { ajoContract } from "@/lib/contract";
 import { ConnectWallet } from "@/components/ConnectWallet";
 
@@ -49,7 +49,7 @@ function GroupCard({ groupId, address }: { groupId: number; address: string }) {
         <h3 className="font-bold" style={{color: '#17402A'}}>Group #{groupId}</h3>
         <div className="flex gap-2">
           {isAdmin && <span className="text-xs px-2 py-1 rounded-lg" style={{background: '#2E6B4620', color: '#2E6B46'}}>Admin</span>}
-          {isMember && !isAdmin && <span className="text-xs px-2 py-1 rounded-lg" style={{background: '#5DA87A20', color: '#5DA87A'}}>Member</span>}
+          {isMember && && !isAdmin && <span className="text-xs px-2 py-1 rounded-lg" style={{background: '#5DA87A20', color: '#5DA87A'}}>Member</span>}
           <span className="text-xs px-2 py-1 rounded-lg" style={{background: active ? '#5DA87A20' : '#e5353520', color: active ? '#5DA87A' : '#e53535'}}>{active ? 'Active' : 'Completed'}</span>
         </div>
       </div>
@@ -64,17 +64,38 @@ function GroupCard({ groupId, address }: { groupId: number; address: string }) {
 export default function Dashboard() {
   const { isConnected, address } = useAccount();
   const [activeTab, setActiveTab] = useState("mygroups");
+  const [newGroupId, setNewGroupId] = useState<number | null>(null);
 
-  const { writeContract: writeCreate, isPending: creatingGroup, isSuccess: groupCreated } = useWriteContract();
+  const { writeContract: writeCreate, isPending: creatingGroup, data: createTxHash } = useWriteContract();
   const { writeContract: writeJoin, isPending: joiningGroup, isSuccess: groupJoined } = useWriteContract();
   const { writeContract: writeApprove, isPending: approving, isSuccess: approved } = useWriteContract();
   const { writeContract: writeContribute, isPending: contributing, isSuccess: contributed } = useWriteContract();
   const { writeContract: writePayout, isPending: payingOut, isSuccess: payoutDone } = useWriteContract();
 
-  const { data: groupCount } = useReadContract({
+  const { data: createReceipt } = useWaitForTransactionReceipt({ hash: createTxHash });
+
+  const { data: groupCount, refetch: refetchGroupCount } = useReadContract({
     ...ajoContract,
     functionName: "groupCount",
   });
+
+  useEffect(() => {
+    if (createReceipt) {
+      refetchGroupCount();
+      for (const log of createReceipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: ajoContract.abi,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (decoded.eventName === "GroupCreated") {
+            setNewGroupId(Number((decoded.args as any).groupId));
+          }
+        } catch {}
+      }
+    }
+  }, [createReceipt]);
 
   const [createAmount, setCreateAmount] = useState("");
   const [createMembers, setCreateMembers] = useState("");
@@ -85,6 +106,7 @@ export default function Dashboard() {
 
   function createGroup() {
     if (!createAmount || !createMembers) return;
+    setNewGroupId(null);
     writeCreate({
       ...ajoContract,
       functionName: "createGroup",
@@ -148,16 +170,16 @@ export default function Dashboard() {
         <div className="max-w-2xl mx-auto px-6 py-8">
 
           {/* TABS */}
-          <div className="flex gap-2 mb-6">
+          <div className="flex gap-2 mb-6 overflow-x-auto">
             {["mygroups", "create", "join", "contribute", "payout"].map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
-                className="px-4 py-2 text-sm rounded-xl font-semibold capitalize"
+                className="px-4 py-2 text-sm rounded-xl font-semibold capitalize whitespace-nowrap"
                 style={{
                   background: activeTab === tab ? '#2E6B46' : 'rgba(255,255,255,0.8)',
                   color: activeTab === tab ? 'white' : '#2E6B46',
                   border: '1px solid rgba(46,107,70,0.2)'
                 }}>
-                {tab === "mygroups" ? "My Groups" : tab}
+                {tab === "mygroups" ? "My Groups" : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -174,7 +196,7 @@ export default function Dashboard() {
           {activeTab === "mygroups" && (
             <div className="grid gap-4">
               <h2 className="text-xl font-bold" style={{color: '#17402A'}}>My Groups</h2>
-              {totalGroups === 0 && <p className="text-gray-500 text-sm">No groups found. Create or join one!</p>}
+              {totalGroups === 0 && <p className="text-gray-500 text-sm">No groups yet. Create or join one!</p>}
               {groupIds.map(id => (
                 <GroupCard key={id} groupId={id} address={address || ""} />
               ))}
@@ -190,11 +212,14 @@ export default function Dashboard() {
               <button onClick={createGroup} disabled={creatingGroup} style={{background: '#2E6B46'}} className="w-full py-3 text-white rounded-xl font-semibold hover:opacity-90">
                 {creatingGroup ? "Creating..." : "Create Ajo"}
               </button>
-              {groupCreated && (
-                <div style={{background: '#2E6B4610', border: '1px solid #2E6B46'}} className="mt-3 p-3 rounded-xl text-center">
+              {createTxHash && !newGroupId && (
+                <p className="text-sm text-gray-500 mt-2">Waiting for confirmation...</p>
+              )}
+              {newGroupId && (
+                <div style={{background: '#2E6B4610', border: '1px solid #2E6B46'}} className="mt-3 p-4 rounded-xl text-center">
                   <p className="text-sm text-gray-600">Ajo created! Your Group ID is:</p>
-                  <p className="text-2xl font-bold" style={{color: '#2E6B46'}}>{groupCount ? Number(groupCount).toString() : "..."}</p>
-                  <p className="text-xs text-gray-400">Share this ID with your members</p>
+                  <p className="text-4xl font-bold my-2" style={{color: '#2E6B46'}}>{newGroupId}</p>
+                  <p className="text-xs text-gray-400">Share this ID with your members so they can join</p>
                 </div>
               )}
             </div>
@@ -208,7 +233,7 @@ export default function Dashboard() {
               <button onClick={joinGroup} disabled={joiningGroup} style={{background: '#2E6B46'}} className="w-full py-3 text-white rounded-xl font-semibold hover:opacity-90">
                 {joiningGroup ? "Joining..." : "Join Ajo"}
               </button>
-              {groupJoined && <p className="text-green-600 text-sm mt-2">Joined! Go to My Groups to see it.</p>}
+              {groupJoined && <p className="text-green-600 text-sm mt-2">Joined! Go to My Groups tab to see it.</p>}
             </div>
           )}
 
