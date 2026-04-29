@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt } from "wagmi";
+import { useWriteContract, useAccount, useReadContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
 import { parseUnits, decodeEventLog } from "viem";
 import { ajoContract } from "@/lib/contract";
 import { ConnectWallet } from "@/components/ConnectWallet";
@@ -39,9 +39,6 @@ function GroupCard({ groupId, address }: { groupId: number; address: string }) {
 
   const [admin, contributionAmount, memberCount, currentRound, active] = group as [string, bigint, bigint, bigint, boolean];
   const isAdmin = admin.toLowerCase() === address.toLowerCase();
-  const isMember = (members as string[] || []).map(m => m.toLowerCase()).includes(address.toLowerCase());
-
-  if (!isAdmin && !isMember) return null;
 
   return (
     <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.2)'}} className="p-4 rounded-2xl shadow-sm">
@@ -49,7 +46,7 @@ function GroupCard({ groupId, address }: { groupId: number; address: string }) {
         <h3 className="font-bold" style={{color: '#17402A'}}>Group #{groupId}</h3>
         <div className="flex gap-2">
           {isAdmin && <span className="text-xs px-2 py-1 rounded-lg" style={{background: '#2E6B4620', color: '#2E6B46'}}>Admin</span>}
-          {isMember && !isAdmin && <span className="text-xs px-2 py-1 rounded-lg" style={{background: '#5DA87A20', color: '#5DA87A'}}>Member</span>}
+          {!isAdmin && <span className="text-xs px-2 py-1 rounded-lg" style={{background: '#5DA87A20', color: '#5DA87A'}}>Member</span>}
           <span className="text-xs px-2 py-1 rounded-lg" style={{background: active ? '#5DA87A20' : '#e5353520', color: active ? '#5DA87A' : '#e53535'}}>{active ? 'Active' : 'Completed'}</span>
         </div>
       </div>
@@ -65,19 +62,82 @@ export default function Dashboard() {
   const { isConnected, address } = useAccount();
   const [activeTab, setActiveTab] = useState("mygroups");
   const [newGroupId, setNewGroupId] = useState<number | null>(null);
+  const [myGroupIds, setMyGroupIds] = useState<number[]>([]);
+  const publicClient = usePublicClient();
 
   const { writeContract: writeCreate, isPending: creatingGroup, data: createTxHash } = useWriteContract();
-  const { writeContract: writeJoin, isPending: joiningGroup, isSuccess: groupJoined } = useWriteContract();
+  const { writeContract: writeJoin, isPending: joiningGroup, isSuccess: groupJoined, data: joinTxHash } = useWriteContract();
   const { writeContract: writeApprove, isPending: approving, isSuccess: approved } = useWriteContract();
   const { writeContract: writeContribute, isPending: contributing, isSuccess: contributed } = useWriteContract();
   const { writeContract: writePayout, isPending: payingOut, isSuccess: payoutDone } = useWriteContract();
 
   const { data: createReceipt } = useWaitForTransactionReceipt({ hash: createTxHash });
+  const { data: joinReceipt } = useWaitForTransactionReceipt({ hash: joinTxHash });
 
   const { data: groupCount, refetch: refetchGroupCount } = useReadContract({
     ...ajoContract,
     functionName: "groupCount",
   });
+
+  // Fetch groups from events
+  useEffect(() => {
+    if (!address || !publicClient) return;
+
+    async function fetchMyGroups() {
+      try {
+        const createdLogs = await publicClient!.getLogs({
+          address: ajoContract.address,
+          event: {
+            type: "event",
+            name: "GroupCreated",
+            inputs: [
+              { name: "groupId", type: "uint256", indexed: false },
+              { name: "admin", type: "address", indexed: false },
+              { name: "contribution", type: "uint256", indexed: false },
+            ],
+          },
+          fromBlock: BigInt(0),
+          toBlock: "latest",
+        });
+
+        const joinedLogs = await publicClient!.getLogs({
+          address: ajoContract.address,
+          event: {
+            type: "event",
+            name: "MemberJoined",
+            inputs: [
+              { name: "groupId", type: "uint256", indexed: false },
+              { name: "member", type: "address", indexed: false },
+            ],
+          },
+          fromBlock: BigInt(0),
+          toBlock: "latest",
+        });
+
+        const ids = new Set<number>();
+
+        for (const log of createdLogs) {
+          const args = log.args as any;
+          if (args.admin?.toLowerCase() === address?.toLowerCase()) {
+            ids.add(Number(args.groupId));
+          }
+        }
+
+        for (const log of joinedLogs) {
+          const args = log.args as any;
+          if (args.member?.toLowerCase() === address?.toLowerCase()) {
+            ids.add(Number(args.groupId));
+          }
+        }
+
+        setMyGroupIds(Array.from(ids).sort((a, b) => a - b));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    fetchMyGroups();
+  }, [address, publicClient, createReceipt, joinReceipt]);
 
   useEffect(() => {
     if (createReceipt) {
@@ -151,9 +211,6 @@ export default function Dashboard() {
     });
   }
 
-  const totalGroups = groupCount ? Number(groupCount) : 0;
-  const groupIds = Array.from({ length: totalGroups }, (_, i) => i + 1);
-
   return (
     <main className="min-h-screen" style={{background: 'linear-gradient(135deg, #B67E7D15 0%, #ffffff 50%, #5DA87A15 100%)'}}>
       <nav style={{backdropFilter: 'blur(20px)', background: 'rgba(255,255,255,0.7)', borderBottom: '1px solid rgba(46,107,70,0.1)'}} className="sticky top-0 z-50 flex justify-between items-center px-8 py-4">
@@ -196,8 +253,8 @@ export default function Dashboard() {
           {activeTab === "mygroups" && (
             <div className="grid gap-4">
               <h2 className="text-xl font-bold" style={{color: '#17402A'}}>My Groups</h2>
-              {totalGroups === 0 && <p className="text-gray-500 text-sm">No groups yet. Create or join one!</p>}
-              {groupIds.map(id => (
+              {myGroupIds.length === 0 && <p className="text-gray-500 text-sm">No groups yet. Create or join one!</p>}
+              {myGroupIds.map(id => (
                 <GroupCard key={id} groupId={id} address={address || ""} />
               ))}
             </div>
