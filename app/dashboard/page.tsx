@@ -49,7 +49,7 @@ function GroupCard({ groupId, address }: { groupId: number; address: string }) {
         <h3 className="font-bold" style={{color: '#17402A'}}>Group #{groupId}</h3>
         <div className="flex gap-2">
           {isAdmin && <span className="text-xs px-2 py-1 rounded-lg" style={{background: '#2E6B4620', color: '#2E6B46'}}>Admin</span>}
-          {isMember && && !isAdmin && <span className="text-xs px-2 py-1 rounded-lg" style={{background: '#5DA87A20', color: '#5DA87A'}}>Member</span>}
+          {isMember && !isAdmin && <span className="text-xs px-2 py-1 rounded-lg" style={{background: '#5DA87A20', color: '#5DA87A'}}>Member</span>}
           <span className="text-xs px-2 py-1 rounded-lg" style={{background: active ? '#5DA87A20' : '#e5353520', color: active ? '#5DA87A' : '#e53535'}}>{active ? 'Active' : 'Completed'}</span>
         </div>
       </div>
