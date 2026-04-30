@@ -2,14 +2,14 @@ import { createConfig, http } from "wagmi";
 import { defineChain } from "viem";
 
 export const arcTestnet = defineChain({
-  id: 1313161555,
+  id: 5042002,
   name: "ARC Testnet",
-  nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://rpc.archetypenet.io"] },
+    default: { http: ["https://rpc.testnet.arc.network"] },
   },
   blockExplorers: {
-    default: { name: "ARC Explorer", url: "https://explorer.archetypenet.io" },
+    default: { name: "ARC Explorer", url: "https://testnet.arcscan.app" },
   },
   testnet: true,
 });
