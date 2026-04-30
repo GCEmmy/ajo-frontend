@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useWriteContract, useAccount, useReadContract, useReadContracts, useWaitForTransactionReceipt } from "wagmi";
-import { parseUnits, decodeEventLog } from "viem";
+import { useState } from "react";
+import { useWriteContract, useAccount, useReadContract } from "wagmi";
+import { parseUnits } from "viem";
 import { ajoContract } from "@/lib/contract";
 import { ConnectWallet } from "@/components/ConnectWallet";
 
@@ -64,38 +64,17 @@ function GroupCard({ groupId, address }: { groupId: number; address: string }) {
 export default function Dashboard() {
   const { isConnected, address } = useAccount();
   const [activeTab, setActiveTab] = useState("mygroups");
-  const [newGroupId, setNewGroupId] = useState<number | null>(null);
 
-  const { writeContract: writeCreate, isPending: creatingGroup, data: createTxHash } = useWriteContract();
+  const { writeContract: writeCreate, isPending: creatingGroup, isSuccess: groupCreated } = useWriteContract();
   const { writeContract: writeJoin, isPending: joiningGroup, isSuccess: groupJoined } = useWriteContract();
   const { writeContract: writeApprove, isPending: approving, isSuccess: approved } = useWriteContract();
   const { writeContract: writeContribute, isPending: contributing, isSuccess: contributed } = useWriteContract();
   const { writeContract: writePayout, isPending: payingOut, isSuccess: payoutDone } = useWriteContract();
 
-  const { data: createReceipt } = useWaitForTransactionReceipt({ hash: createTxHash });
-
-  const { data: groupCount, refetch: refetchGroupCount } = useReadContract({
+  const { data: groupCount, refetch: refetchCount } = useReadContract({
     ...ajoContract,
     functionName: "groupCount",
   });
-
-  useEffect(() => {
-    if (createReceipt) {
-      refetchGroupCount();
-      for (const log of createReceipt.logs) {
-        try {
-          const decoded = decodeEventLog({
-            abi: ajoContract.abi,
-            data: log.data,
-            topics: log.topics,
-          });
-          if (decoded.eventName === "GroupCreated") {
-            setNewGroupId(Number((decoded.args as any).groupId));
-          }
-        } catch {}
-      }
-    }
-  }, [createReceipt]);
 
   const [createAmount, setCreateAmount] = useState("");
   const [createMembers, setCreateMembers] = useState("");
@@ -106,7 +85,6 @@ export default function Dashboard() {
 
   function createGroup() {
     if (!createAmount || !createMembers) return;
-    setNewGroupId(null);
     writeCreate({
       ...ajoContract,
       functionName: "createGroup",
@@ -169,11 +147,10 @@ export default function Dashboard() {
       ) : (
         <div className="max-w-2xl mx-auto px-6 py-8">
 
-          {/* TABS */}
           <div className="flex gap-2 mb-6 overflow-x-auto">
             {["mygroups", "create", "join", "contribute", "payout"].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                className="px-4 py-2 text-sm rounded-xl font-semibold capitalize whitespace-nowrap"
+              <button key={tab} onClick={() => { setActiveTab(tab); if(tab === "mygroups") refetchCount(); }}
+                className="px-4 py-2 text-sm rounded-xl font-semibold whitespace-nowrap"
                 style={{
                   background: activeTab === tab ? '#2E6B46' : 'rgba(255,255,255,0.8)',
                   color: activeTab === tab ? 'white' : '#2E6B46',
@@ -184,7 +161,6 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* FAUCET BANNER */}
           <div style={{background: 'rgba(93,168,122,0.1)', border: '1px solid rgba(46,107,70,0.2)'}} className="p-4 rounded-2xl text-center mb-6">
             <p className="text-sm text-gray-600 mb-2">Need test USDC to use Ajo on ARC Testnet?</p>
             <a href="https://faucet.circle.com/" target="_blank" style={{background: '#2E6B46'}} className="inline-block px-4 py-2 text-sm text-white rounded-xl hover:opacity-90">
@@ -192,10 +168,12 @@ export default function Dashboard() {
             </a>
           </div>
 
-          {/* MY GROUPS TAB */}
           {activeTab === "mygroups" && (
             <div className="grid gap-4">
-              <h2 className="text-xl font-bold" style={{color: '#17402A'}}>My Groups</h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold" style={{color: '#17402A'}}>My Groups</h2>
+                <button onClick={() => refetchCount()} style={{color: '#2E6B46', border: '1px solid #2E6B46'}} className="px-3 py-1 text-xs rounded-xl">Refresh</button>
+              </div>
               {totalGroups === 0 && <p className="text-gray-500 text-sm">No groups yet. Create or join one!</p>}
               {groupIds.map(id => (
                 <GroupCard key={id} groupId={id} address={address || ""} />
@@ -203,7 +181,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* CREATE TAB */}
           {activeTab === "create" && (
             <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.1)'}} className="p-6 rounded-2xl shadow-sm">
               <h2 className="text-xl font-bold mb-4" style={{color: '#17402A'}}>Create a New Ajo</h2>
@@ -212,20 +189,15 @@ export default function Dashboard() {
               <button onClick={createGroup} disabled={creatingGroup} style={{background: '#2E6B46'}} className="w-full py-3 text-white rounded-xl font-semibold hover:opacity-90">
                 {creatingGroup ? "Creating..." : "Create Ajo"}
               </button>
-              {createTxHash && !newGroupId && (
-                <p className="text-sm text-gray-500 mt-2">Waiting for confirmation...</p>
-              )}
-              {newGroupId && (
+              {groupCreated && (
                 <div style={{background: '#2E6B4610', border: '1px solid #2E6B46'}} className="mt-3 p-4 rounded-xl text-center">
-                  <p className="text-sm text-gray-600">Ajo created! Your Group ID is:</p>
-                  <p className="text-4xl font-bold my-2" style={{color: '#2E6B46'}}>{newGroupId}</p>
-                  <p className="text-xs text-gray-400">Share this ID with your members so they can join</p>
+                  <p className="text-sm text-gray-600">Ajo created successfully!</p>
+                  <p className="text-sm text-gray-500 mt-1">Go to My Groups tab and click Refresh to see it.</p>
                 </div>
               )}
             </div>
           )}
 
-          {/* JOIN TAB */}
           {activeTab === "join" && (
             <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.1)'}} className="p-6 rounded-2xl shadow-sm">
               <h2 className="text-xl font-bold mb-4" style={{color: '#17402A'}}>Join an Ajo</h2>
@@ -233,11 +205,10 @@ export default function Dashboard() {
               <button onClick={joinGroup} disabled={joiningGroup} style={{background: '#2E6B46'}} className="w-full py-3 text-white rounded-xl font-semibold hover:opacity-90">
                 {joiningGroup ? "Joining..." : "Join Ajo"}
               </button>
-              {groupJoined && <p className="text-green-600 text-sm mt-2">Joined! Go to My Groups tab to see it.</p>}
+              {groupJoined && <p className="text-green-600 text-sm mt-2">Joined! Go to My Groups and click Refresh.</p>}
             </div>
           )}
 
-          {/* CONTRIBUTE TAB */}
           {activeTab === "contribute" && (
             <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.1)'}} className="p-6 rounded-2xl shadow-sm">
               <h2 className="text-xl font-bold mb-4" style={{color: '#17402A'}}>Make Contribution</h2>
@@ -255,7 +226,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* PAYOUT TAB */}
           {activeTab === "payout" && (
             <div style={{background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(46,107,70,0.1)'}} className="p-6 rounded-2xl shadow-sm">
               <h2 className="text-xl font-bold mb-4" style={{color: '#17402A'}}>Trigger Payout (Admin only)</h2>
